@@ -31,16 +31,14 @@ import { calculate_gpa, extractFinalPercent, gradeToGPA } from './helpers';
 
 // Vue Components
 import Vue from 'vue';
+import ClassGrade from './components/ClassGrade';
 import ExtensionInfo from './components/ExtensionInfo.vue';
 import HypoAssignment from './components/HypoAssignment.vue';
 import HypoGrades from './components/HypoGrades';
 
-let percent_main_page = true;
-browser.storage.local.get({ percent_main_page: true }).then(
-    function (returned) {
-        percent_main_page = returned.percent_main_page;
-    }, function () {},
-);
+// Used models
+import Course from './models/Course';
+
 main();
 function main () {
     // Button on options page
@@ -105,7 +103,11 @@ function main_page () {
             const $first_grade = $cells.eq(s1col).find('a[href^="scores.html"]');
             if ($first_grade.length === 1) {
                 if (gradeToGPA($first_grade.text()) !== -1) {
-                    fill_percent($first_grade, `https://powerschool.sas.edu.sg/guardian/${$first_grade.attr('href')}`, [0], 0);
+                    new (Vue.extend(ClassGrade))({
+                        propsData: {
+                            course: new Course("", `https://powerschool.sas.edu.sg/guardian/${$first_grade.attr('href')}`, $first_grade.text()),
+                        },
+                    }).$mount($first_grade.get(0));
                 }
             }
         } else {
@@ -113,14 +115,13 @@ function main_page () {
         }
         if ($course.length === 1) {
             const temp = $course.parents().eq(1).children("td[align=left]").text().match(".*(?=Details)")[0];
-            courses.push({
-                name: temp.trim(),
-                grade: $course.text(),
-                link: $course.attr('href'),
-                fp: -1,
-            });
+            courses.push(new Course(temp.trim(), `https://powerschool.sas.edu.sg/guardian/${$course.attr('href')}`, $course.text()));
             if (gradeToGPA($course.text()) !== -1) {
-                fill_percent($course, "https://powerschool.sas.edu.sg/guardian/" + $course.attr('href'), courses[courses.length - 1], "fp");
+                new (Vue.extend(ClassGrade))({
+                    propsData: {
+                        course: courses[courses.length - 1],
+                    },
+                }).$mount($course.get(0));
             }
         }
     }
@@ -160,24 +161,6 @@ function login_page () {
                 showInfo: result.showExtensionInfo,
             },
         }).$mount('#saspes-info');
-    });
-}
-function fill_percent ($fill_location, url_link, percents, pos_in_arr) {
-    if (!percent_main_page) {
-        return;
-    }
-    $.ajax({
-        url: url_link,
-    }).done(function (data) {
-        const final_percent = extractFinalPercent(data);
-        if (!final_percent) {
-            percents[pos_in_arr] = -1;
-            return;
-        }
-        $fill_location.append(` (${final_percent.toFixed(2)})`);
-        percents[pos_in_arr] = final_percent.toFixed(2);
-    }).fail(function () {
-        percents[pos_in_arr] = -1;
     });
 }
 
